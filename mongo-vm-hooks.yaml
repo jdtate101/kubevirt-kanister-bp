@@ -1,0 +1,68 @@
+actions:
+  backupPrehook:
+    kind: ""
+    name: ""
+    phases:
+    - args:
+        command:
+        - bash
+        - -o
+        - errexit
+        - -o
+        - pipefail
+        - -c
+        - |
+          export MONGODB_ROOT_PASSWORD='{{ index .Phases.lockMongo.Secrets.mongoDbSecret.Data "mongodb-root-password" | toString }}'
+          mongosh --authenticationDatabase admin \
+            -u root \
+            -p "${MONGODB_ROOT_PASSWORD}" \
+            --host mongo-kanister.{{ .Object.metadata.namespace }}.svc.cluster.local \
+            --eval "db.fsyncLock()"
+        image: ghcr.io/kanisterio/mongodb:0.116.0
+        namespace: '{{ .Object.metadata.namespace }}'
+      func: KubeTask
+      name: lockMongo
+      objects:
+        mongoDbSecret:
+          apiVersion: ""
+          group: ""
+          kind: Secret
+          name: mongo-kanister
+          namespace: '{{ .Object.metadata.namespace }}'
+          resource: ""
+  backupPosthook:
+    kind: ""
+    name: ""
+    phases:
+    - args:
+        command:
+        - bash
+        - -o
+        - errexit
+        - -o
+        - pipefail
+        - -c
+        - |
+          export MONGODB_ROOT_PASSWORD='{{ index .Phases.unlockMongo.Secrets.mongoDbSecret.Data "mongodb-root-password" | toString }}'
+          mongosh --authenticationDatabase admin \
+            -u root \
+            -p "${MONGODB_ROOT_PASSWORD}" \
+            --host mongo-kanister.{{ .Object.metadata.namespace }}.svc.cluster.local \
+            --eval "db.fsyncUnlock()"
+        image: ghcr.io/kanisterio/mongodb:0.116.0
+        namespace: '{{ .Object.metadata.namespace }}'
+      func: KubeTask
+      name: unlockMongo
+      objects:
+        mongoDbSecret:
+          apiVersion: ""
+          group: ""
+          kind: Secret
+          name: mongo-kanister
+          namespace: '{{ .Object.metadata.namespace }}'
+          resource: ""
+apiVersion: cr.kanister.io/v1alpha1
+kind: Blueprint
+metadata:
+  name: mongo-vm-hooks
+  namespace: kasten-io
