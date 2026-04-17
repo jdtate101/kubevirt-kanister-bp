@@ -32,9 +32,9 @@ Rather than exec-ing into the VM (which is not possible with KubeVirt), the blue
 | Component | Name | Namespace |
 |---|---|---|
 | Kanister Blueprint | `mongo-vm-hooks` | `kasten-io` |
-| ClusterIP Service | `mongo-kanister` | `ocpv-rhel9` |
-| Credentials Secret | `mongo-kanister` | `ocpv-rhel9` |
-| VirtualMachine | `rhel-10` | `ocpv-rhel9` |
+| ClusterIP Service | `mongo-kanister` | `<VM namespace>` |
+| Credentials Secret | `mongo-kanister` | `<VM namespace>` |
+| VirtualMachine | `<VM name>` | `<VM namespace>` |
 
 ---
 
@@ -113,7 +113,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: mongo-kanister
-  namespace: ocpv-rhel9
+  namespace: <VM namespace>
 type: Opaque
 stringData:
   mongodb-root-password: "YOUR_PASSWORD"
@@ -130,10 +130,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mongo-kanister
-  namespace: ocpv-rhel9
+  namespace: <VM namespace>
 spec:
   selector:
-    vm.kubevirt.io/name: rhel-10
+    vm.kubevirt.io/name: <VM name>
   ports:
   - name: mongodb
     protocol: TCP
@@ -145,13 +145,13 @@ spec:
 Verify the endpoint is populated after applying:
 
 ```bash
-oc get endpoints mongo-kanister -n ocpv-rhel9
+oc get endpoints mongo-kanister -n <VM namespace>
 ```
 
 You should see a pod IP listed under `ENDPOINTS`. If it shows `<none>`, the selector is not matching — check the virt-launcher pod labels:
 
 ```bash
-oc get pods -n ocpv-rhel9 --show-labels | grep virt-launcher
+oc get pods -n <VM namespace>--show-labels | grep virt-launcher
 ```
 
 ### Kanister Blueprint
@@ -236,7 +236,7 @@ metadata:
 Annotate the VirtualMachine object so Kasten picks up the blueprint automatically:
 
 ```bash
-oc annotate virtualmachine rhel-10 -n ocpv-rhel9 \
+oc annotate virtualmachine <VM name> -n <VM namespace> \
   kanister.kasten.io/blueprint='mongo-vm-hooks'
 ```
 
@@ -244,8 +244,8 @@ Or add it directly to the VM manifest:
 
 ```yaml
 metadata:
-  name: rhel-10
-  namespace: ocpv-rhel9
+  name: <VM name>
+  namespace: <VM namespace>
   annotations:
     kanister.kasten.io/blueprint: mongo-vm-hooks
 ```
@@ -257,9 +257,9 @@ metadata:
 Before running the policy, verify the kanister job pod can reach MongoDB across the service:
 
 ```bash
-oc run mongo-test -n ocpv-rhel9 --rm -it \
+oc run mongo-test -n <VM namespace> --rm -it \
   --image=ghcr.io/kanisterio/mongodb:0.116.0 -- \
-  mongosh --host mongo-kanister.ocpv-rhel9.svc.cluster.local \
+  mongosh --host mongo-kanister.<VM namespace>.svc.cluster.local \
   --authenticationDatabase admin -u root -p YOUR_PASSWORD \
   --eval "db.runCommand({ connectionStatus: 1 })"
 ```
